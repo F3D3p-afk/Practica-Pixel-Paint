@@ -2,9 +2,9 @@
 using System.Numerics;
 
 const int ancho = 900;
-const int alto = 630;
+const int alto = 770;
 const int columnas = 16;
-const int filas = 12;
+const int filas = 16;
 const int tamañoCelda = 38;
 const int cuadrículaX = 270;
 const int cuadrículaY = 95;
@@ -26,6 +26,9 @@ Color[] paleta =
     new Color(204, 105, 91, 255)
 };
 
+const int fondo = 1;
+bool cubeta = false;
+
 int[,] celdas = new int[filas, columnas];
 Limpiar();
 
@@ -37,6 +40,10 @@ Raylib.SetTargetFPS(60);
 while (!Raylib.WindowShouldClose())
 {
     Vector2 mouse = Raylib.GetMousePosition();
+
+    if (Raylib.IsKeyPressed(KeyboardKey.C)) Limpiar();
+    if (Raylib.IsKeyPressed(KeyboardKey.B)) cubeta = !cubeta;
+    if (Raylib.IsKeyPressed(KeyboardKey.R)) CargarFigura();
 
     if (Raylib.IsMouseButtonPressed(MouseButton.Left))
     {
@@ -58,8 +65,11 @@ while (!Raylib.WindowShouldClose())
         int fila = ((int)mouse.Y - cuadrículaY) / tamañoCelda;
 
         if (Raylib.IsMouseButtonDown(MouseButton.Right))
-            celdas[fila, columna] = -1;
-        else if (Raylib.IsMouseButtonDown(MouseButton.Left))
+            celdas[fila, columna] = fondo;
+        else if (cubeta && Raylib.IsMouseButtonPressed(MouseButton.Left))
+            Rellenar(celdas, fila, columna,
+                     celdas[fila, columna], colorSeleccionado);
+        else if (!cubeta && Raylib.IsMouseButtonDown(MouseButton.Left))
             celdas[fila, columna] = colorSeleccionado;
     }
 
@@ -71,8 +81,8 @@ while (!Raylib.WindowShouldClose())
 
     Raylib.DrawText("PALETA: AUTOBOT", 20, 20, 26, texto);
     Raylib.DrawText(
-        "Clic izquierdo: pintar | Clic derecho: borrar",
-        20, 56, 17, texto
+        "Izq: pintar/rellenar | Der: borrar | B: cubeta | C: limpiar | R: figura",
+        20, 56, 16, texto
     );
     Raylib.DrawText("COLORES", 20, 88, 20, texto);
 
@@ -129,6 +139,23 @@ while (!Raylib.WindowShouldClose())
         }
     }
 
+    bool sobreCuadricula = Dentro(
+        mouse, cuadrículaX, cuadrículaY,
+        columnas * tamañoCelda, filas * tamañoCelda
+    );
+
+    string coordenadas = sobreCuadricula
+        ? $"Fila: {((int)mouse.Y - cuadrículaY) / tamañoCelda}  Columna: {((int)mouse.X - cuadrículaX) / tamañoCelda}"
+        : "Fila: --  Columna: --";
+
+    Raylib.DrawText(coordenadas, cuadrículaX, 715, 18, texto);
+    Raylib.DrawText(
+        cubeta ? "Herramienta: CUBETA" : "Herramienta: LAPIZ",
+        20, 630, 18, texto
+    );
+    Raylib.DrawText("B: cambiar herramienta", 20, 660, 16, texto);
+    Raylib.DrawText("R: cargar Autobot", 20, 685, 16, texto);
+
     Raylib.EndDrawing();
 }
 
@@ -140,7 +167,7 @@ void Limpiar()
     {
         for (int columna = 0; columna < columnas; columna++)
         {
-            celdas[fila, columna] = -1;
+            celdas[fila, columna] = fondo;
         }
     }
 }
@@ -153,4 +180,60 @@ static bool Dentro(
            punto.X < x + ancho &&
            punto.Y >= y &&
            punto.Y < y + alto;
+}
+
+// El relleno visita solamente vecinos que comparten un lado.
+static void Rellenar(
+    int[,] dibujo, int fila, int columna,
+    int colorObjetivo, int colorNuevo
+)
+{
+    if (colorObjetivo == colorNuevo) return;
+
+    // Caso base: coordenadas fuera de la matriz.
+    if (fila < 0 || fila >= dibujo.GetLength(0) ||
+        columna < 0 || columna >= dibujo.GetLength(1)) return;
+
+    // Caso base: la celda no pertenece a la región pendiente.
+    if (dibujo[fila, columna] != colorObjetivo) return;
+
+    // Cambiar antes de visitar vecinos evita regresar indefinidamente.
+    dibujo[fila, columna] = colorNuevo;
+
+    Rellenar(dibujo, fila - 1, columna, colorObjetivo, colorNuevo);
+    Rellenar(dibujo, fila + 1, columna, colorObjetivo, colorNuevo);
+    Rellenar(dibujo, fila, columna - 1, colorObjetivo, colorNuevo);
+    Rellenar(dibujo, fila, columna + 1, colorObjetivo, colorNuevo);
+}
+
+void CargarFigura()
+{
+    // Cada dígito representa un índice de la paleta.
+    string[] boceto =
+    {
+        "1111111111111111",
+        "1100111111110011",
+        "1102000000002011",
+        "1102233333322011",
+        "1102255555522011",
+        "1102555555552011",
+        "1102500000522011",
+        "1100260220620011",
+        "1110250220520111",
+        "1110203333020111",
+        "1110203333020111",
+        "1110203333020111",
+        "1111020330201111",
+        "1111102332011111",
+        "1111110000111111",
+        "1111111111111111"
+    };
+
+    for (int fila = 0; fila < filas; fila++)
+    {
+        for (int columna = 0; columna < columnas; columna++)
+        {
+            celdas[fila, columna] = boceto[fila][columna] - '0';
+        }
+    }
 }

@@ -21,3 +21,4 @@ C:\Users\fmigu\OneDrive\Escritorio\Proyectos de Graficos\Color lab\obj\Debug\net
 C:\Users\fmigu\OneDrive\Escritorio\Proyectos de Graficos\Color lab\obj\Debug\net10.0\Color lab.pdb
 C:\Users\fmigu\OneDrive\Escritorio\Proyectos de Graficos\Color lab\obj\Debug\net10.0\Color lab.genruntimeconfig.cache
 C:\Users\fmigu\OneDrive\Escritorio\Proyectos de Graficos\Color lab\obj\Debug\net10.0\ref\Color lab.dll
+C:\Users\fmigu\OneDrive\Escritorio\Proyectos de Graficos\Color lab\obj\Debug\net10.0\Color lab.sourcelink.json
