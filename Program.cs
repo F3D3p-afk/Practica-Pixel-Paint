@@ -1,18 +1,24 @@
-﻿using Raylib_cs;
+﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
+using Raylib_cs;
 
-const int ancho = 900;
-const int alto = 770;
-const int columnas = 16;
-const int filas = 16;
-const int tamañoCelda = 38;
-const int cuadrículaX = 270;
-const int cuadrículaY = 95;
+// Ventana y área de dibujo
+const int anchoVentana = 1000;
+const int altoVentana = 720;
 
+Rectangle lienzo = new Rectangle(260, 100, 710, 570);
+
+// Paleta del programa anterior
 string[] nombres =
 {
-    "Negro", "Blanco", "Azul intenso", "Azul acero",
-    "Azul oscuro", "Rojo", "Rojo claro"
+    "Negro",
+    "Blanco",
+    "Azul intenso",
+    "Azul acero",
+    "Azul oscuro",
+    "Rojo",
+    "Rojo claro"
 };
 
 Color[] paleta =
@@ -26,214 +32,214 @@ Color[] paleta =
     new Color(204, 105, 91, 255)
 };
 
-const int fondo = 1;
-bool cubeta = false;
+// Estado del programa
+List<Trazo> trazos = new List<Trazo>();
 
-int[,] celdas = new int[filas, columnas];
-Limpiar();
+Herramienta herramientaActual = Herramienta.Lapiz;
 
 int colorSeleccionado = 2;
+float grosorActual = 4;
 
-Raylib.InitWindow(ancho, alto, "Paleta de colores - Autobot");
+Vector2 mouseAnterior = Vector2.Zero;
+bool dibujando = false;
+
+Color fondoLienzo = Color.RayWhite;
+Color colorTexto = new Color(35, 45, 55, 255);
+Color colorBorde = new Color(170, 180, 190, 255);
+
+Raylib.InitWindow(anchoVentana, altoVentana, "Paint - Lapiz y memoria");
 Raylib.SetTargetFPS(60);
 
 while (!Raylib.WindowShouldClose())
 {
-    Vector2 mouse = Raylib.GetMousePosition();
+    Vector2 mouseActual = Raylib.GetMousePosition();
 
-    if (Raylib.IsKeyPressed(KeyboardKey.C)) Limpiar();
-    if (Raylib.IsKeyPressed(KeyboardKey.B)) cubeta = !cubeta;
-    if (Raylib.IsKeyPressed(KeyboardKey.R)) CargarFigura();
+    // Cambiar herramienta
+    if (Raylib.IsKeyPressed(KeyboardKey.L))
+        herramientaActual = Herramienta.Lapiz;
 
+    if (Raylib.IsKeyPressed(KeyboardKey.B))
+        herramientaActual = Herramienta.Borrador;
+
+    // Cambiar grosor entre 1 y 30
+    if (Raylib.IsKeyPressed(KeyboardKey.Up))
+        grosorActual = MathF.Min(30, grosorActual + 1);
+
+    if (Raylib.IsKeyPressed(KeyboardKey.Down))
+        grosorActual = MathF.Max(1, grosorActual - 1);
+
+    // Limpiar todos los trazos
+    if (Raylib.IsKeyPressed(KeyboardKey.C))
+    {
+        trazos.Clear();
+        dibujando = false;
+    }
+
+    // Detectar inicio de un clic
     if (Raylib.IsMouseButtonPressed(MouseButton.Left))
     {
+        // Revisar si se seleccionó un color
         for (int i = 0; i < paleta.Length; i++)
         {
-            if (Dentro(mouse, 20, 115 + i * 62, 220, 54))
+            Rectangle botonColor = new Rectangle(
+                20,
+                105 + i * 58,
+                210,
+                50
+            );
+
+            if (Raylib.CheckCollisionPointRec(mouseActual, botonColor))
+            {
                 colorSeleccionado = i;
+                herramientaActual = Herramienta.Lapiz;
+            }
         }
 
-        if (Dentro(mouse, 20, 570, 220, 36))
-            Limpiar();
+        // Iniciar un gesto solamente dentro del lienzo
+        if (Raylib.CheckCollisionPointRec(mouseActual, lienzo))
+        {
+            dibujando = true;
+            mouseAnterior = mouseActual;
+
+            Color colorTrazo = herramientaActual == Herramienta.Borrador
+                ? fondoLienzo
+                : paleta[colorSeleccionado];
+
+            // Guardar un punto para que un clic también deje una marca
+            trazos.Add(new Trazo(
+                mouseActual,
+                mouseActual,
+                colorTrazo,
+                grosorActual
+            ));
+        }
     }
 
-    // Mantén pulsado el botón para pintar o borrar varias celdas.
-    if (Dentro(mouse, cuadrículaX, cuadrículaY,
-               columnas * tamañoCelda, filas * tamañoCelda))
+    // Guardar segmentos mientras se arrastra el mouse
+    if (dibujando && Raylib.IsMouseButtonDown(MouseButton.Left))
     {
-        int columna = ((int)mouse.X - cuadrículaX) / tamañoCelda;
-        int fila = ((int)mouse.Y - cuadrículaY) / tamañoCelda;
+        Color colorTrazo = herramientaActual == Herramienta.Borrador
+            ? fondoLienzo
+            : paleta[colorSeleccionado];
 
-        if (Raylib.IsMouseButtonDown(MouseButton.Right))
-            celdas[fila, columna] = fondo;
-        else if (cubeta && Raylib.IsMouseButtonPressed(MouseButton.Left))
-            Rellenar(celdas, fila, columna,
-                     celdas[fila, columna], colorSeleccionado);
-        else if (!cubeta && Raylib.IsMouseButtonDown(MouseButton.Left))
-            celdas[fila, columna] = colorSeleccionado;
+        if (Vector2.Distance(mouseAnterior, mouseActual) > 0)
+        {
+            trazos.Add(new Trazo(
+                mouseAnterior,
+                mouseActual,
+                colorTrazo,
+                grosorActual
+            ));
+
+            mouseAnterior = mouseActual;
+        }
     }
+
+    // Terminar el gesto cuando se suelta el botón
+    if (Raylib.IsMouseButtonReleased(MouseButton.Left))
+        dibujando = false;
 
     Raylib.BeginDrawing();
+
     Raylib.ClearBackground(new Color(245, 247, 250, 255));
 
-    Color texto = new Color(35, 45, 55, 255);
-    Color borde = new Color(170, 180, 190, 255);
-
-    Raylib.DrawText("PALETA: AUTOBOT", 20, 20, 26, texto);
+    // Encabezado
+    Raylib.DrawText("PAINT: LAPIZ Y MEMORIA", 20, 20, 26, colorTexto);
     Raylib.DrawText(
-        "Izq: pintar/rellenar | Der: borrar | B: cubeta | C: limpiar | R: figura",
-        20, 56, 16, texto
+        "Dibuja con clic izquierdo y arrastra el mouse",
+        20, 58, 18, colorTexto
     );
-    Raylib.DrawText("COLORES", 20, 88, 20, texto);
 
+    // Paleta de colores
     for (int i = 0; i < paleta.Length; i++)
     {
-        int y = 115 + i * 62;
-        Color color = paleta[i];
+        int y = 105 + i * 58;
 
-        Raylib.DrawRectangle(20, y, 220, 54, Color.White);
-        Raylib.DrawRectangleLines(20, y, 220, 54, borde);
-        Raylib.DrawRectangle(27, y + 6, 42, 42, color);
-        Raylib.DrawRectangleLines(27, y + 6, 42, 42, borde);
+        Raylib.DrawRectangle(20, y, 210, 50, Color.White);
+        Raylib.DrawRectangleLines(20, y, 210, 50, colorBorde);
 
-        Raylib.DrawText(nombres[i], 78, y + 4, 16, texto);
+        Raylib.DrawRectangle(27, y + 5, 40, 40, paleta[i]);
+        Raylib.DrawRectangleLines(27, y + 5, 40, 40, colorBorde);
+
+        Raylib.DrawText(nombres[i], 75, y + 7, 16, colorTexto);
+
         Raylib.DrawText(
-            $"RGB: {color.R}, {color.G}, {color.B}",
-            78, y + 22, 13, texto
-        );
-        Raylib.DrawText(
-            $"#{color.R:X2}{color.G:X2}{color.B:X2}",
-            78, y + 38, 12, texto
+            $"#{paleta[i].R:X2}{paleta[i].G:X2}{paleta[i].B:X2}",
+            75, y + 27, 14, colorTexto
         );
 
-        if (colorSeleccionado == i)
-            Raylib.DrawRectangleLines(20, y, 220, 54, Color.Black);
+        if (colorSeleccionado == i &&
+            herramientaActual == Herramienta.Lapiz)
+        {
+            Raylib.DrawRectangleLines(20, y, 210, 50, Color.Black);
+        }
     }
 
-    Raylib.DrawRectangle(
-        20, 570, 220, 36,
-        new Color(225, 231, 237, 255)
+    // Información de herramientas
+    string nombreHerramienta =
+        herramientaActual == Herramienta.Lapiz ? "LAPIZ" : "BORRADOR";
+
+    Raylib.DrawText($"Herramienta: {nombreHerramienta}", 20, 530, 17, colorTexto);
+    Raylib.DrawText($"Grosor: {grosorActual:0} px", 20, 555, 17, colorTexto);
+    Raylib.DrawText($"Segmentos: {trazos.Count}", 20, 580, 17, colorTexto);
+
+    Raylib.DrawText("L: lapiz   B: borrador", 20, 615, 16, colorTexto);
+    Raylib.DrawText("Flechas arriba/abajo: grosor", 20, 640, 15, colorTexto);
+    Raylib.DrawText("C: limpiar", 20, 665, 16, colorTexto);
+
+    // Fondo y borde del lienzo
+    Raylib.DrawRectangleRec(lienzo, fondoLienzo);
+
+    // Evitar que los trazos se dibujen fuera del lienzo
+    Raylib.BeginScissorMode(
+        (int)lienzo.X,
+        (int)lienzo.Y,
+        (int)lienzo.Width,
+        (int)lienzo.Height
     );
-    Raylib.DrawRectangleLines(20, 570, 220, 36, borde);
-    Raylib.DrawText("LIMPIAR CUADRICULA", 30, 580, 15, texto);
 
-    Raylib.DrawText("COMPOSICION", cuadrículaX, 66, 20, texto);
-
-    for (int fila = 0; fila < filas; fila++)
+    // Recuperar todos los trazos guardados
+    foreach (Trazo trazo in trazos)
     {
-        for (int columna = 0; columna < columnas; columna++)
+        if (trazo.Desde == trazo.Hasta)
         {
-            int x = cuadrículaX + columna * tamañoCelda;
-            int y = cuadrículaY + fila * tamañoCelda;
-
-            Color relleno = celdas[fila, columna] == -1
-                ? Color.White
-                : paleta[celdas[fila, columna]];
-
-            Raylib.DrawRectangle(
-                x, y, tamañoCelda, tamañoCelda, relleno
+            Raylib.DrawCircleV(
+                trazo.Desde,
+                trazo.Grosor / 2,
+                trazo.Color
             );
-            Raylib.DrawRectangleLines(
-                x, y, tamañoCelda, tamañoCelda, borde
+        }
+        else
+        {
+            Raylib.DrawLineEx(
+                trazo.Desde,
+                trazo.Hasta,
+                trazo.Grosor,
+                trazo.Color
             );
         }
     }
 
-    bool sobreCuadricula = Dentro(
-        mouse, cuadrículaX, cuadrículaY,
-        columnas * tamañoCelda, filas * tamañoCelda
-    );
+    Raylib.EndScissorMode();
 
-    string coordenadas = sobreCuadricula
-        ? $"Fila: {((int)mouse.Y - cuadrículaY) / tamañoCelda}  Columna: {((int)mouse.X - cuadrículaX) / tamañoCelda}"
-        : "Fila: --  Columna: --";
-
-    Raylib.DrawText(coordenadas, cuadrículaX, 715, 18, texto);
-    Raylib.DrawText(
-        cubeta ? "Herramienta: CUBETA" : "Herramienta: LAPIZ",
-        20, 630, 18, texto
-    );
-    Raylib.DrawText("B: cambiar herramienta", 20, 660, 16, texto);
-    Raylib.DrawText("R: cargar Autobot", 20, 685, 16, texto);
+    Raylib.DrawRectangleLinesEx(lienzo, 2, colorBorde);
 
     Raylib.EndDrawing();
 }
 
 Raylib.CloseWindow();
 
-void Limpiar()
+// Herramientas disponibles
+enum Herramienta
 {
-    for (int fila = 0; fila < filas; fila++)
-    {
-        for (int columna = 0; columna < columnas; columna++)
-        {
-            celdas[fila, columna] = fondo;
-        }
-    }
+    Lapiz,
+    Borrador
 }
 
-static bool Dentro(
-    Vector2 punto, int x, int y, int ancho, int alto
-)
-{
-    return punto.X >= x &&
-           punto.X < x + ancho &&
-           punto.Y >= y &&
-           punto.Y < y + alto;
-}
-
-// El relleno visita solamente vecinos que comparten un lado.
-static void Rellenar(
-    int[,] dibujo, int fila, int columna,
-    int colorObjetivo, int colorNuevo
-)
-{
-    if (colorObjetivo == colorNuevo) return;
-
-    // Caso base: coordenadas fuera de la matriz.
-    if (fila < 0 || fila >= dibujo.GetLength(0) ||
-        columna < 0 || columna >= dibujo.GetLength(1)) return;
-
-    // Caso base: la celda no pertenece a la región pendiente.
-    if (dibujo[fila, columna] != colorObjetivo) return;
-
-    // Cambiar antes de visitar vecinos evita regresar indefinidamente.
-    dibujo[fila, columna] = colorNuevo;
-
-    Rellenar(dibujo, fila - 1, columna, colorObjetivo, colorNuevo);
-    Rellenar(dibujo, fila + 1, columna, colorObjetivo, colorNuevo);
-    Rellenar(dibujo, fila, columna - 1, colorObjetivo, colorNuevo);
-    Rellenar(dibujo, fila, columna + 1, colorObjetivo, colorNuevo);
-}
-
-void CargarFigura()
-{
-    // Cada dígito representa un índice de la paleta.
-    string[] boceto =
-    {
-        "1111111111111111",
-        "1100111111110011",
-        "1102000000002011",
-        "1102233333322011",
-        "1102255555522011",
-        "1102555555552011",
-        "1102500000522011",
-        "1100260220620011",
-        "1110250220520111",
-        "1110203333020111",
-        "1110203333020111",
-        "1110203333020111",
-        "1111020330201111",
-        "1111102332011111",
-        "1111110000111111",
-        "1111111111111111"
-    };
-
-    for (int fila = 0; fila < filas; fila++)
-    {
-        for (int columna = 0; columna < columnas; columna++)
-        {
-            celdas[fila, columna] = boceto[fila][columna] - '0';
-        }
-    }
-}
+// Cada segmento conserva sus propias características
+readonly record struct Trazo(
+    Vector2 Desde,
+    Vector2 Hasta,
+    Color Color,
+    float Grosor
+);
